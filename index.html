@@ -930,40 +930,56 @@ function guardarFila(boton) {
 
     const inputFoto = fila.querySelector(".campo-foto");
     
-    // Función interna para proceder con el guardado de datos
     const realizarGuardado = () => {
-        const registro = {
-            id: fila.dataset.registroId || fila.dataset.id,
-            fecha: fila.querySelector(".campo-fecha").value,
-            supervisor: fila.querySelector(".campo-supervisor").value,
-            colaborador: colaboradorInput.value.trim(),
-            referencia: fila.querySelector(".campo-referencia").value,
-            nTijera: fila.querySelector(".campo-tijera").value,
-            firmaTrabajador: fila.dataset.firmaTrabajador || "",
-            firmaSupervisor: fila.dataset.firmaSupervisor || "",
-            observacion: fila.querySelector(".campo-observacion").value,
-            descuentoNomina: fila.querySelector(".campo-descuento").value,
-            foto: fila.dataset.foto || "",
-            entregado: fila.dataset.firmaEntrega ? "Sí" : "No",
-            firmaEntrega: fila.dataset.firmaEntrega || ""
-        };
+        try {
+            const registro = {
+                id: fila.dataset.registroId || fila.dataset.id,
+                fecha: fila.querySelector(".campo-fecha").value,
+                supervisor: fila.querySelector(".campo-supervisor").value,
+                colaborador: colaboradorInput.value.trim(),
+                referencia: fila.querySelector(".campo-referencia").value,
+                nTijera: fila.querySelector(".campo-tijera").value,
+                firmaTrabajador: fila.dataset.firmaTrabajador || "",
+                firmaSupervisor: fila.dataset.firmaSupervisor || "",
+                observacion: fila.querySelector(".campo-observacion").value,
+                descuentoNomina: fila.querySelector(".campo-descuento").value,
+                foto: fila.dataset.foto || "",
+                entregado: fila.dataset.firmaEntrega ? "Sí" : "No",
+                firmaEntrega: fila.dataset.firmaEntrega || ""
+            };
 
-        let registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
-        const indice = registros.findIndex(e => String(e.id) === String(registro.id));
-        if (indice >= 0) {
-            registros[indice] = registro;
-        } else {
-            registros.push(registro);
+            let registros = [];
+            try {
+                registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+            } catch (err) {
+                registros = [];
+            }
+
+            const indice = registros.findIndex(e => String(e.id) === String(registro.id));
+            if (indice >= 0) {
+                registros[indice] = registro;
+            } else {
+                registros.push(registro);
+            }
+
+            // Intentamos guardar en memoria local (protegido por si excede el límite)
+            try {
+                localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
+            } catch (storageError) {
+                console.warn("Memoria local llena, los datos se guardarán en la nube.", storageError);
+            }
+
+            // Sincronizamos con Firebase (Nube)
+            sincronizarRegistroConNube(registro);
+            fila.dataset.registroId = registro.id;
+            
+            alert("¡Registro guardado correctamente!");
+        } catch (e) {
+            console.error("Error al guardar:", e);
+            alert("Ocurrió un error al guardar. Intenta comprimir la imagen o limpiar datos.");
         }
-
-        localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
-        sincronizarRegistroConNube(registro);
-        fila.dataset.registroId = registro.id;
-        
-        alert("¡Registro guardado correctamente!");
     };
 
-    // Si hay una foto seleccionada, la procesamos; si no, guarda de una vez
     if (inputFoto && inputFoto.files && inputFoto.files[0]) {
         const archivoFoto = inputFoto.files[0];
         const lector = new FileReader();
@@ -972,8 +988,8 @@ function guardarFila(boton) {
             const img = new Image();
             img.onload = function() {
                 const canvas = document.createElement("canvas");
-                const MAX_WIDTH = 500;
-                const MAX_HEIGHT = 500;
+                const MAX_WIDTH = 400; // Reducido aún más para evitar saturar la memoria
+                const MAX_HEIGHT = 400;
                 let width = img.width;
                 let height = img.height;
 
@@ -988,17 +1004,20 @@ function guardarFila(boton) {
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
 
-                fila.dataset.foto = canvas.toDataURL("image/jpeg", 0.6);
+                // Calidad comprimida al 50% para que pese muy poco y no falle
+                fila.dataset.foto = canvas.toDataURL("image/jpeg", 0.5);
                 
                 const estadoFotoSpan = fila.querySelector(".estado-foto");
                 if (estadoFotoSpan) estadoFotoSpan.textContent = "Foto guardada";
                 
                 realizarGuardado();
             };
+            img.onerror = function() {
+                realizarGuardado(); // Si falla la imagen, guarda el texto y la firma al menos
+            };
             img.src = e.target.result;
         };
         lector.onerror = function() {
-            // Si ocurre algún error leyendo el archivo, guarda los demás datos para no bloquear al usuario
             realizarGuardado();
         };
         lector.readAsDataURL(archivoFoto);

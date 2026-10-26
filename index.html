@@ -38,6 +38,28 @@
             window.firebaseChild = child;
             
             const dbRef = ref(db, 'registrosTijerasFalcon');
+            
+            // Forzar lectura inmediata al cargar la página en cualquier celular
+            get(dbRef).then((snapshot) => {
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    const registrosArray = Object.values(data);
+                    localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registrosArray));
+                } else {
+                    // Si la nube está vacía, subimos los predeterminados
+                    const initial = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+                    if(initial.length > 0) {
+                        const obj = {};
+                        initial.forEach(r => obj[r.id] = r);
+                        set(dbRef, obj);
+                    }
+                }
+                if (window.cargarTablaDesdeMemoria) window.cargarTablaDesdeMemoria();
+            }).catch((error) => {
+                console.error("Error leyendo de Firebase:", error);
+            });
+
+            // Mantener sincronización en tiempo real
             onValue(dbRef, (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
@@ -53,7 +75,6 @@
             console.warn("Firebase offline. Se usará almacenamiento local.", error);
         }
     </script>
-
     <style>
         * {
             box-sizing: border-box;

@@ -928,16 +928,18 @@ function guardarFila(boton) {
     }
 
     const inputFoto = fila.querySelector(".campo-foto");
-    const archivoFoto = inputFoto.files[0];
-
-    if (archivoFoto) {
+    
+    // Si seleccionaron un archivo nuevo en este momento
+    if (inputFoto && inputFoto.files && inputFoto.files[0]) {
+        const archivoFoto = inputFoto.files[0];
         const lector = new FileReader();
+        
         lector.onload = function(e) {
             const img = new Image();
             img.onload = function() {
                 const canvas = document.createElement("canvas");
-                const MAX_WIDTH = 600;
-                const MAX_HEIGHT = 600;
+                const MAX_WIDTH = 500;
+                const MAX_HEIGHT = 500;
                 let width = img.width;
                 let height = img.height;
 
@@ -958,22 +960,26 @@ function guardarFila(boton) {
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
 
-                fila.dataset.foto = canvas.toDataURL("image/jpeg", 0.7);
+                // Guardamos la foto comprimida directamente en el dataset de la fila
+                const base64Foto = canvas.toDataURL("image/jpeg", 0.6);
+                fila.dataset.foto = base64Foto;
                 
                 const estadoFotoSpan = fila.querySelector(".estado-foto");
                 if (estadoFotoSpan) estadoFotoSpan.textContent = "Foto guardada";
                 
-                procesarGuardadoLocal(fila);
+                // Ejecutamos el guardado final con la foto ya lista
+                ejecutarGuardadoFinal(fila);
             };
             img.src = e.target.result;
         };
         lector.readAsDataURL(archivoFoto);
     } else {
-        procesarGuardadoLocal(fila);
+        // Si no seleccionaron foto nueva, guardamos con lo que ya tuviera la fila previamente
+        ejecutarGuardadoFinal(fila);
     }
 }
 
-function procesarGuardadoLocal(fila) {
+function ejecutarGuardadoFinal(fila) {
     const registro = {
         id: fila.dataset.registroId || fila.dataset.id,
         fecha: fila.querySelector(".campo-fecha").value,
@@ -985,7 +991,7 @@ function procesarGuardadoLocal(fila) {
         firmaSupervisor: fila.dataset.firmaSupervisor || "",
         observacion: fila.querySelector(".campo-observacion").value,
         descuentoNomina: fila.querySelector(".campo-descuento").value,
-        foto: fila.dataset.foto || "",
+        foto: fila.dataset.foto || "", // Asegura que la foto viaje en el objeto
         entregado: fila.dataset.firmaEntrega ? "Sí" : "No",
         firmaEntrega: fila.dataset.firmaEntrega || ""
     };
@@ -1001,9 +1007,9 @@ function procesarGuardadoLocal(fila) {
     localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
     sincronizarRegistroConNube(registro);
     fila.dataset.registroId = registro.id;
-    alert("Registro guardado correctamente.");
+    
+    alert("¡Registro y foto guardados correctamente!");
 }
-
 function eliminarFila(boton) {
     if (!confirm("¿Deseas eliminar esta fila?")) return;
     const fila = boton.closest("tr");

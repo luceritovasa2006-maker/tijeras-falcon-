@@ -1,0 +1,1395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falcon Farms - Entrega y Asignación de Tijeras</title>
+
+    <!-- Librería para la firma digital táctil -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    <!-- Librería ExcelJS para estilos avanzados en Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+
+    <!-- MÓDULOS DE FIREBASE CONFIGURADOS CON TUS DATOS -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, get, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBaiW8wKvDYHeO_zZbKhJ09QRnKjSo3uSw",
+            authDomain: "tijerasfalcon-5d4be.firebaseapp.com",
+            databaseURL: "https://tijerasfalcon-5d4be-default-rtdb.firebaseio.com",
+            projectId: "tijerasfalcon-5d4be",
+            storageBucket: "tijerasfalcon-5d4be.firebasestorage.app",
+            messagingSenderId: "327521015881",
+            appId: "1:327521015881:web:500ca1afb5eb6a511b8798",
+            measurementId: "G-T3HMEH3Z1K"
+        };
+
+        let db = null;
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            window.firebaseDb = db;
+            window.firebaseRef = ref;
+            window.firebaseSet = set;
+            window.firebaseOnValue = onValue;
+            window.firebaseGet = get;
+            window.firebaseChild = child;
+            
+            const dbRef = ref(db, 'registrosTijerasFalcon');
+            onValue(dbRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const registrosArray = Object.values(data);
+                    localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registrosArray));
+                    if (window.cargarTablaDesdeMemoria) window.cargarTablaDesdeMemoria();
+                    if (document.getElementById("vistaConsolidado").classList.contains("activa") && window.cargarConsolidado) {
+                        window.cargarConsolidado();
+                    }
+                }
+            });
+        } catch (error) {
+            console.warn("Firebase offline. Se usará almacenamiento local.", error);
+        }
+    </script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 10px;
+            color: #000;
+        }
+
+        .contenedor {
+            width: 100%;
+            max-width: 1550px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #000;
+        }
+
+        .tabla-encabezado {
+            width: 100%;
+            border-collapse: collapse;
+            border: 2px solid #000;
+            text-align: center;
+            background: #fff;
+        }
+
+        .tabla-encabezado td {
+            border: 1px solid #000;
+            padding: 6px;
+            vertical-align: middle;
+        }
+
+        .logo-cell {
+            background-color: #fff;
+            padding: 6px !important;
+        }
+
+        .logo-img {
+            width: 145px;
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .titulo-cell {
+            font-size: 12px;
+            line-height: 1.3;
+        }
+
+        .sub-titulo {
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .info-cell {
+            font-size: 11px;
+            padding: 0 !important;
+        }
+
+        .info-line {
+            border-bottom: 1px solid #000;
+            padding: 3px;
+            text-align: center;
+        }
+
+        .info-line:last-child {
+            border-bottom: none;
+        }
+
+        .nota-legal {
+            border: 1px solid #000;
+            border-top: none;
+            padding: 6px 10px;
+            font-size: 10px;
+            text-align: justify;
+            line-height: 1.25;
+            background-color: #fff;
+            margin-bottom: 0;
+        }
+
+        .seccion-filtro {
+            margin: 12px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        select,
+        input[type="text"],
+        input[type="date"] {
+            padding: 6px;
+            border: 1px solid #777;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        select {
+            font-weight: bold;
+            color: #1e824c;
+        }
+
+        .tabla-contenedor {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 15px;
+            border: 1px solid #000;
+        }
+
+        .tabla-principal {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            min-width: 1350px;
+        }
+
+        .tabla-principal th,
+        .tabla-principal td {
+            border: 1px solid #000;
+            padding: 5px;
+            text-align: center;
+        }
+
+        .tabla-principal th {
+            background-color: #e2e2e2;
+            color: #000;
+            font-size: 10px;
+        }
+
+        .btn-guardar {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-guardar:hover {
+            background-color: #219150;
+        }
+
+        .btn-descargar-archivo {
+            background-color: #d35400;
+            color: white;
+            border: none;
+            padding: 7px 14px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .btn-descargar-archivo:hover {
+            background-color: #a04000;
+        }
+
+        .input-colaborador {
+            width: 220px;
+        }
+
+        .select-referencia {
+            font-weight: bold;
+            color: #1e824c;
+            padding: 4px;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-contenido {
+            background: white;
+            padding: 20px;
+            border-radius: 6px;
+            text-align: center;
+            border: 2px solid #000;
+            max-width: 95%;
+        }
+
+        .vista-seccion {
+            display: none;
+        }
+
+        .vista-seccion.activa {
+            display: block;
+        }
+
+        .barra-superior {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #000;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .seccion-tabla-supervisor {
+            margin-bottom: 35px;
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #000;
+        }
+
+        .titulo-supervisor {
+            background-color: #1e824c;
+            color: white;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 0;
+            border: 1px solid #000;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+                margin: 0;
+            }
+
+            .seccion-filtro,
+            .barra-superior button,
+            .tabla-principal button {
+                display: none !important;
+            }
+
+            .contenedor {
+                max-width: 100%;
+                border: none;
+            }
+        }
+    </style>
+</head>
+<body>
+<!-- ================= VISTA DE REGISTRO ================= -->
+<div id="vistaRegistro" class="vista-seccion activa">
+    <div class="contenedor">
+
+        <table class="tabla-encabezado">
+            <tr>
+                <td class="logo-cell" style="width:24%;">
+                    <img
+                        id="logoFalcon"
+                        src="https://falconfarms.com/wp-content/uploads/2025/12/Logo-Falcon.png"
+                        alt="Logo Falcon Farms"
+                        class="logo-img"
+                    >
+                </td>
+                <td class="titulo-cell" style="width:56%;">
+                    <strong>FALCON FARMS DE COLOMBIA S.A. - FINCA TORREMOLINOS</strong>
+                    <br>
+                    <span class="sub-titulo">ENTREGA Y ASIGNACIÓN DE TIJERAS</span>
+                </td>
+                <td class="info-cell" style="width:20%;">
+                    <div class="info-line">Versión 1</div>
+                    <div class="info-line">sep.-26</div>
+                    <div class="info-line">Página 1 de 1</div>
+                </td>
+            </tr>
+        </table>
+        <div class="nota-legal">
+            Los suscritos trabajadores, de conformidad con lo establecido en el Artículo 149 (Numerales 1 y 2) del Código Sustantivo del Trabajo, autorizamos de manera expresa, libre, voluntaria y por escrito a nuestro empleador Falcon Farms de Colombia S.A. - Finca Torremolinos, para que realice el descuento de nuestros respectivos salarios por concepto de la pérdida de herramientas de trabajo asignadas a nuestro cargo. El descuento se aplicará por el valor real de la herramienta, en las cuotas acordadas y respetando strictly los límites legales vigentes en Colombia. Para constancia de nuestra aceptación voluntaria, firmamos individualmente a continuación:
+        </div>
+
+        <div class="seccion-filtro">
+            <label for="selectSupervisor"><strong>Seleccionar Supervisor</strong></label>
+            <select id="selectSupervisor" onchange="cargarTablaDesdeMemoria()">
+                <option value="ELENA">ELENA</option>
+                <option value="XIMENA">XIMENA</option>
+                <option value="MARTHA">MARTHA</option>
+                <option value="SANDRA">SANDRA</option>
+                <option value="YOLANDA">YOLANDA</option>
+                <option value="LEONARDO">LEONARDO</option>
+                <option value="JORGE">JORGE</option>
+                <option value="VICTOR">VICTOR</option>
+                <option value="ADRIANA">ADRIANA</option>
+                <option value="MARCELA">MARCELA</option>
+                <option value="MEDICIONES">MEDICIONES</option>
+                <option value="RETOCONEO">RETOCONEO</option>
+                <option value="BZC">BZC</option>
+                <option value="MIPE">MIPE</option>
+                <option value="FORMACION">FORMACION</option>
+                <option value="ADMON">ADMON</option>
+                <option value="MIRFE">MIRFE</option>
+                <option value="MTTO">MTTO</option>
+                <option value="PALO SECO">PALO SECO</option>
+            </select>
+
+            <button class="btn-guardar" onclick="agregarFilaManual()">+ Agregar colaborador</button>
+            <button class="btn-descargar-archivo" onclick="descargarArchivoHTMLConDatos()">📥 Descargar Archivo Actualizado</button>
+            <button class="btn-guardar" style="background:#8e44ad;" onclick="cambiarVista('consolidado')">Ver tablas acumuladas</button>
+            <button class="btn-guardar" style="background:#e67e22;" onclick="restablecerDatosPredeterminados()">Restablecer lista inicial</button>
+        </div>
+
+        <div class="tabla-contenedor">
+            <table class="tabla-principal">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Supervisor</th>
+                        <th>Colaborador</th>
+                        <th>Referencia</th>
+                        <th>N° Tijera</th>
+                        <th>Firma del Trabajador</th>
+                        <th>Firma del Supervisor</th>
+                        <th>Observación</th>
+                        <th>Descuento por Nómina</th>
+                        <th>Foto Evidencia</th>
+                        <th>Entregado (Firma Entrega)</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="cuerpoTabla"></tbody>
+            </table>
+        </div>
+    </div>
+</div>                                            
+<!-- ================= VISTA CONSOLIDADA ================= -->
+<div id="vistaConsolidado" class="vista-seccion">
+    <div class="contenedor">
+        <div class="barra-superior">
+            <div>
+                <h2>FALCON FARMS DE COLOMBIA S.A. - FINCA TORREMOLINOS</h2>
+                <h4>CONSOLIDADO GENERAL DE ASIGNACIÓN DE TIJERAS</h4>
+            </div>
+            <div>
+                <button class="btn-guardar" style="background:#7f8c8d;" onclick="cambiarVista('registro')">Volver a registro</button>
+                <button class="btn-guardar" style="background:#2980b9;" onclick="exportarExcelConsolidado()">Descargar Excel</button>
+                <button class="btn-guardar" style="background:#8e44ad;" onclick="window.print()">Imprimir / Guardar PDF</button>
+            </div>
+        </div>
+        <div id="contenedorTablas"></div>
+    </div>
+</div>
+
+<!-- ================= MODAL DE FIRMAS ================= -->
+<div id="modalFirma" class="modal" style="display:none;">
+    <div class="modal-contenido">
+        <h4 id="tituloModalFirma">Firma digital</h4>
+        <canvas id="canvasFirma" width="320" height="160" style="border:1px solid #000;background:#fff;touch-action:none;"></canvas>
+        <br><br>
+        <button type="button" onclick="limpiarFirma()">Limpiar</button>
+        <button type="button" onclick="guardarFirmaCanvas()">Aceptar firma</button>
+        <button type="button" onclick="cerrarModalFirma()">Cancelar</button>
+    </div>
+</div>
+<script>
+let filaActualFirma = null;
+let tipoFirmaActual = null;
+let signaturePad = null;
+
+const registrosInicialesPredeterminados = [
+    { id: "e1", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "BAEZ SULBARAN SOLANÑELY GABRIELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e2", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "DIAZ FARFAN NIDIA YOMAIRA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e3", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "FLOREZ JIMENEZ YISEL KAROLINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e4", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "GOMEZ JIMENEZ JINNA MARCELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e5", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "GUIO ACUÑA HUMBERTO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e6", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "GUZMAN MARLEYI", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e7", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "IPUANA EPIEYU GEOVANY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e8", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "IPUANA IPUANA ANDREINA CECILIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e9", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "MELENDEZ PINEDA LEYLA JUDITH", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e10", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "MERCADO NORIEGA RAFAEL ANTONIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e11", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "MORENO MORENO GLORIA ALICIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e12", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "OLIVERA RAMOS OSCAR FERNANDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e13", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "ORJUELA MAHECHA ANGELICA DANIELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e14", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "PELAYO ARIAS CRISTIAN DARIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e15", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "RUDA LA ROTTA FABIAN GIOVANNI", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "e16", fecha: "2026-10-26", supervisor: "ELENA", colaborador: "REYES TORRES ROSA ELENA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x1", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "CARO BAYUELO RAFAEL ENRIQUE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x2", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "GALEANO FRANCO YENNY CAROLINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x3", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "LOPEZ CASALLAS JOSE JAIRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x4", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "MENDOZA ROZO ANGIE LORENA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x5", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "MORENO PAEZ MARIA TERESA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x6", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "OTALORA CUERVO ANA BEATRIZ", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x7", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "PUENTES CORREA YUDY AMANDA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x8", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "RAMIREZ TREJOS ADRIANA LORENA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x9", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "RODRIGUEZ MATEUS CARLOS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x10", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "SUAREZ DE LA CRUZ YAMID JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x11", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "TORRES ATENCIO ANGIE CAROLINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x12", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "MONTAÑO ACEVEDO SANDRA XIMENA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x13", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "TORRES SUAREZ ABDENAGO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x14", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "VERGARA JIMENEZ BLANCA RUBIELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x15", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "YEPES BUENO KAREN DAHIANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "x16", fecha: "2026-10-26", supervisor: "XIMENA", colaborador: "AVILA GOMEZ ROSA ANGELICA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m1", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "FORERO CAMPOS RAFAEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m2", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "GOMEZ ROMERO ERIKA KATHERINE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m3", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "LOPEZ FERNANDEZ FRANCIELYS ALEJANDRA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m4", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "MALAGON MOLINA BEATRIZ", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m5", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "ORTEGA VEGA KEILYS JULIETH", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m6", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "OVIEDO PEREZ JUANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m7", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "PEDRAZA AREVALO YOLANDA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m8", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "PORRAS GANBA HECTOR JULIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m9", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "REYES MATHEUS YANNIRED CAROLINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m10", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "RODRIGUEZ FLORES ANDY ANDERSON", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m11", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "RODRIGUEZ GORDILLO LEIDY MARISOL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m12", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "RUBIANO GARCIA JOSE ARTURO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m13", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "SANCHEZ SUAREZ CLAUDIA MARCELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m14", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "TOVAR MARTINEZ YEIMER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m15", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "BALLESTEROS RODRIGUEZ DIANA MARCELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "m16", fecha: "2026-10-26", supervisor: "MARTHA", colaborador: "JIMENEZ CAPADOR MARTHA LILIANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s1", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "CALVO PABON MARCOLINO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s2", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "CHAVES DEAZA GUSTAVO HERNAN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s3", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "CUPITRA CULMA LINA MARCELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s4", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "FERRER PLAZA LEANDRO JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s5", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "GAMBA HERNANDEZ LUZ DARY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s6", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "MENDOZA LOPEZ YAMILE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s7", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "MONTES JULIO AHILER DAVID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s8", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "MUÑOZ NOVOA BERTHA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s9", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "PACHECO ARNESTO JOHANNA MILAGROS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s10", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "PICO CONTRERAS LEIDY PAOLA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s11", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "RIVERA MEJIA RENE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s12", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "RODRIGUEZ LEON GABRIELA ISABEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s13", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "SANCHEZ MUÑOZ LEYDI JOHANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s14", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "SILVA LOPEZ EDUAR MANUEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s15", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "TORRES RODRIGUEZ JAVIER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s16", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "AROCA CAPERA DINA LUZ", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "s17", fecha: "2026-10-26", supervisor: "SANDRA", colaborador: "LEON CACHAY SANDRA MILENA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y1", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "CASTRO RODRIGUEZ SANDRA MILENA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y2", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "EPINAYU EPINAYU ATIEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y3", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "EPINAYU EPINAYU LAUREANO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y4", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "HERNANDEZ RICARDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y5", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "LOPEZ CORDERO KEVIN MANUEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y6", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "MARTINEZ CASTRO JENNY JOHANNA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y7", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "MARTINEZ PASSO YEFERSON", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y8", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "MUÑOZ CRUZ LUIS HERNANDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y9", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "PINZON VELANDIA ESPERANZA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y10", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "PULIDO PULIDO CARLOS JULIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y11", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "PUSHAINA FRANCISCO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y12", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "TORRES COLLAZOS ELIDA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y13", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "TORRES SUAVITA EULALIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y14", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "TORRES SUAVITA PEDRO NEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y15", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "AMOR MELENDRES INGRIS YOHANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "y16", fecha: "2026-10-26", supervisor: "YOLANDA", colaborador: "MORA MONROY NANCY YOLANDA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l1", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "ANTUNEZ GARCIA JULIO CESAR", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l2", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "BERRIO ORTEGA ABIGAIL DALLANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l3", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "CITA URIBE SANDRA PATRICIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l4", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "CUPITRA CUPITRA HEIDY MELISSA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l5", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "LA ROTTA OTALORA MARTHA LUCIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l6", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "LEON PACHECO RONALD JUNIOR", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l7", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "MARTINES AHUMADA ROSA ELISA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l8", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "MATUTE SEGOVIA JAVIER ENRIQUE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l9", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "MORA CASTRO JAVIER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l10", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "MORENO CAPERA MARIA LUCELIDA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l11", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "MORENO ROSA MARIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l12", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "ORTIZ PEREZ ERLINDA MARIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l13", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "PEREZ BOSCAN DEYVILIN CHIQUINQUIRA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l14", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "PINEDA TOLOZA CARLOS ALBERTO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l15", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "RAMOS ESCOBAR MARIA HORTENSIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l16", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "SANCHEZ REYNALDO MAYERLING YAMILETH", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l17", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "SOTELO CORREA TAIDIS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l18", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "SUAREZ SUAREZ JOSE ALBERTO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l19", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "TINEO SOLANO DELVIS JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l20", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "TOVA NAVARRETE JOSE MARCELO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l21", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "TRASLAVIÑA DURAN LEIDY JULIETH", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l22", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "ULLOA QUINTERO LUIS MARIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l23", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "VILORIA VARGA DANNY JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l24", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "ARROYO ARRIETA VERONICA ESTHER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "l25", fecha: "2026-10-26", supervisor: "LEONARDO", colaborador: "ACOSTA BOJACA LEONARDO FABIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j1", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "BARRIOS LEGUIA JOSE EULICE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j2", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "CARDENAS BONILLA LAURA ALEJANDRA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j3", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "CARRILLO ALMANZA GISELLA JUDITH", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j4", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "CULMA CAPERA ERLIS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j5", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "GONZALEZ VILLAR JENNIFER PATRICIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j6", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "HERNANDEZ RIOS GERLEY DE JESUS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j7", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "JULIO FERNANDEZ JHON FREDY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j8", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "MALAGON POVEDA ALFONSO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j9", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "OCHOA RUIZ SANTIAGO JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j10", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "OVIEDO PEREZ JULIAN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j11", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "QUEVEDO PARRA ISMAEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j12", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "RIOS LUGO YENJADER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j13", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "RIOS TAPIAS JESUS MANUEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j14", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "SANCHEZ BETANCUR EDITH YULITZA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j15", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "TORRES QUIROGA PRIMITIVO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j16", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "VARGAS MARTINEZ DAYBELIN CAROLINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j17", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "ALDANA BUITRAGO EDUARDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "j18", fecha: "2026-10-26", supervisor: "JORGE", colaborador: "RINCON SILVA JORGE ENRIQUE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v1", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "BAUTISTA HORNERO JOSE ARCENIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v2", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "BENAVIDES BALLEN LUIS ALEJANDRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v3", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "BETANCUR CHAPARRO YOLIMA XIMENA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v4", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "CARDENAS MONTAÑO JUAN CAMILO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v5", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "GARCIA TOVAR IVAN DARIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v6", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "GOMEZ SANCHEZ MARIA OLGA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v7", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "GOMEZ SUAREZ ANA GRACIELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v8", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "MORA BENITE HENRRY ARMANDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v9", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "OTALORA AREVALO NESTOR ALEXANDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v10", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "RIVERA BOHORQUEZ NANCY PAOLA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v11", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "ROMERO CASTIBLANCO HECTOR JULIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v12", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "SANCHEZ DIAZ NESTOR FABIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v13", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "VIDES CONTRERAS DANIELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v14", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "CANTILLO CASTRO RAFAEL ALBERTO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "v15", fecha: "2026-10-26", supervisor: "VICTOR", colaborador: "GARZON SIERRA VICTOR MANUEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a1", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "CAVANZO QUIROGA ANA BRICEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a2", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "ESCOBAR MARIN JOSE GENTIL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a3", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "ESPINOSA GARZON LUZ ANGELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a4", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "GALVIS JUSTO PASTOR", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a5", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "GIRO BRICEÑO MARIA DE LOS ANGELES", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a6", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "LOPEZ MARIA EMILCE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a7", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "MATUTE CANEDO MAITE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a8", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "MELO PINZON JUAN DE JESUS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a9", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "MESTIZO MARTINEZ YULIE KATHERINE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a10", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "OROZCO RONDON ROSA MARIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a11", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "PEREZ OCAMPO GLORIA PIEDAD", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a12", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "QUIROGA GOMEZ MIRYAM YOLANDA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a13", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "ROMERO GIL RAMON", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a14", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "URIANA EPINAYU OMAR", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a15", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "VELA SUAREZ ABEL ANTONIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a16", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "PIRELA BARROS JOSE DAVID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "a17", fecha: "2026-10-26", supervisor: "ADRIANA", colaborador: "HERNANDEZ VILLALBA ADRIANA YINETH", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar1", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "BARAHONA LUZ STELLA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar2", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "CARDENAS QUINTERO KAREN DAYANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar3", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "CASTRO MORENO CAROLINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar4", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "ESTRADA MURILLO JORMEN JACINTO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar5", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "FARFAN RODRIGUEZ EMILIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar6", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "MARTINEZ PEREZ LAURA NATALIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar7", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "MONTIEL SIJUANA JANDRIAN ALEJANDRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar8", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "PUERTA CALDERON YEREMIS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar9", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "REYES CARDENAS NELSI", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar10", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "RODRIGUEZ RUBIANO WILSON JOVANNY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar11", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "SECO PEREZ RONNI DAVID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar12", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "URBANO TIMON ANDREA FERNANDA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar13", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "USECHE LAZARO JOHANA LICED", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar14", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "VERGARA MERCADO LILIANA LIZMAR", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar15", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "BETANCUR CHAPARRO JOHANA PAULINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mar16", fecha: "2026-10-26", supervisor: "MARCELA", colaborador: "QUINTERO UMBARILA YENY MARCELA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med1", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "BONIVENTO EPINAYU JENIFER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med2", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "CASTIBLANCO GOMEZ WILMAR ALEXANDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med3", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "JIMENEZ BALLEN ADRIANA LUCIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med4", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "MELENDEZ PINEDA LEYDIS PAOLA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med5", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "MUÑOZ PINZON DAVID ALEXANDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med6", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "FERREBUZ SILVA FRED DARIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med7", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "FRAGUA CRUZ ANDRES FELIPE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "med8", fecha: "2026-10-26", supervisor: "MEDICIONES", colaborador: "CONTRERA MERCADO ANGELY VANESSA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret1", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "AMOROCHO BROCHERO YAMER ESNEIDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret2", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "BRICEÑO GOMEZ JERSON ALEXANDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret3", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "CANTILLO NAVARRO JOSUE ALEJANDRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret4", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "CIFUENTES SANCHEZ MARIO ALEXANDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret5", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "NAVARRO ANAYA YEFRIS MANUEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret6", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "RODRIGUEZ MOLINA CLAUDIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret7", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "SANCHEZ SANDRA DAYANNA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "ret8", fecha: "2026-10-26", supervisor: "RETOCONEO", colaborador: "ABREU HERNANDEZ ZUSKHEY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "bzc1", fecha: "2026-10-26", supervisor: "BZC", colaborador: "BELTRAN ESPAÑA MELIZA DEL CARMEN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "bzc2", fecha: "2026-10-26", supervisor: "BZC", colaborador: "GUERRERO CONTRERAS DARWIN JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "bzc3", fecha: "2026-10-26", supervisor: "BZC", colaborador: "PAYARES GALEANO MARIELA NATHALY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "bzc4", fecha: "2026-10-26", supervisor: "BZC", colaborador: "SILVA MALAGON CAROL GISELLE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "bzc5", fecha: "2026-10-26", supervisor: "BZC", colaborador: "SOSA MISAEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "bzc6", fecha: "2026-10-26", supervisor: "BZC", colaborador: "AMADO LABRIANO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip1", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "ARENAS VILLAGRAN BLANCA YANETH", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip2", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "ARPUSHANA BONIVENTO SANTANDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip3", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "BENITES SEPULVEDA JEAN CARLOS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip4", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "BRUJES GUERRERO OSCAR DAVID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip5", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "CHAPARRO RODRIGUEZ YEFERSON STIVEN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip6", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "CORDOBA VERGARA JUAN CAMILO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip7", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "CORTES GARZON NELLY ESPERANZA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip8", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "DURAN BRITO ANDRES ALEJANDRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip9", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "FORERO MENDIETA WILMAR ALEXANDER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip10", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "GOMEZ VELASQUEZ JHOFRAN ALEXIS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip11", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "HERNANDEZ CAICEDO NEYDER ESMID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip12", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "HERNANDEZ VILLALBA LEYDY YURANY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip13", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "LONDOÑO BERNAL YESID ROBEIRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip14", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "LOPEZ MARTINEZ JAIME JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip15", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "MUÑOZ LEAL CHEIBER ALFONSO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip16", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "PRADA RAMIREZ CESAR ANDRES", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip17", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "QUIROZ LOPEZ MICHAEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip18", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "RUIZ VIRACACHA RUDDY CRISTINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip19", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "SABINO EPIEYU SAMIR EUSEBIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip20", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "SUAREZ BORRERO HERNAN DARIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip21", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "TOCA LARA GERARDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip22", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "TOTA SIERRA YENNY CAROLINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip23", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "FLORES ROSALES WILLI JAINER", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mip24", fecha: "2026-10-26", supervisor: "MIPE", colaborador: "RODRIGUEZ BOJACA JULIO ANDRES", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form1", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "GONZALEZ JOSE DOMINGO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form2", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "LOPEZ RODRIGUEZ VIRGINIA DEL VALLE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form3", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "MANCERA JIMENEZ WILBER LIBARDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form4", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "MELENDEZ BALCINILLA MARIO JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form5", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "OÑATE ROMERO JEISON RAFAEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form6", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "QUINTERO ROA JOSE ARVEY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form7", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "TONJACIPA TOCARRUNCHO NANCY ESPERANZA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form8", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "TORRENEGRA BERDUGO KEVIN JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form9", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "RODRIGUEZ GOMEZ JEIDER CAMILO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form10", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "TAMARA PALACIN ROSA MICHEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form11", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "ACERO ROA JAIME", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "form12", fecha: "2026-10-26", supervisor: "FORMACION", colaborador: "GAITAN CANO MONICA VALENTINA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "adm1", fecha: "2026-10-26", supervisor: "ADMON", colaborador: "OSORIO IBAÑEZ NATALIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "adm2", fecha: "2026-10-26", supervisor: "ADMON", colaborador: "ALFONSO PULGARIN JUAN HERNANDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir1", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "AHUMADA SUAREZ CESAR AUGUSTO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir2", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "CARDENAS BONILLA DUVER STEVEN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir3", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "CARDENAS SERRANO DREILES ALFONSO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir4", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "CONTRERAS AYALA NORVEY EDUARDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir5", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "CONTRERAS SALGADO GABRIEL EDUARDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir6", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "CUPITRA CARDOZO DAVID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir7", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "DE DIOS MESTIZO JUAN DIEGO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir8", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "DUQUE MONTENEGRO ALAN DANIEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir9", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "GALARZA JULIO JUAN MIGUEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir10", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "HERNANDEZ ALAYON JHON JAIRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir11", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "LANCHEROS MEDINA YORMARY BRIYID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir12", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "MEDINA CAÑIZALEZ YORMAN JESUS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir13", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "MENDEZ GARZON JAIME", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir14", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "MUÑOZ MUÑOZ JESUS ELADIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir15", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "PAEZ LOPEZ BIVIANA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir16", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "RAMIREZ FLOREZ JARVIE ANDRES", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir17", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "RIVERA VISCUE JANIER ANDREY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir18", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "URIANA URIANA JAIMEN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mir19", fecha: "2026-10-26", supervisor: "MIRFE", colaborador: "BOJACA PRIETO HERNAN IGNACIO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt1", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "ABRIL SANDOVAL WILLIAM ARMANDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt2", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "ACUÑA RODRIGUEZ BRAYAN ANDRES", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt3", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "BUITRAGO CASAS ANDRES FELIPE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt4", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "CUPITRA CARDOZO RONALD", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt5", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "GARCIA FUENTES JORGE EDUARDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt6", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "GARZON MORA KEVIN NICOLAS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt7", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "GUERRERO OVIEDO JUAN CARLOS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt8", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "HENAO PEREZ EDWIN ALEJANDRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt9", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "LOPEZ CANO HAROL CAMILO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt10", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "MARRUGO GUTIERREZ YOBANY ANDRES", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt11", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "MESA MARTINEZ JOSE MARTIN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt12", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "PEREZ MELENDEZ WILSON", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt13", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "PUERTO CONTRERAS HENRY", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt14", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "RUBIANO MARCELO JUAN JESUS", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt15", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "SALAMANCA CHAUTA EIMER ALEJANDRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt16", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "SANABRIA RUIZ LUIS HERNANDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt17", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "WALTEROS GAONA CRISTIAN FABIAN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "mtt18", fecha: "2026-10-26", supervisor: "MTTO", colaborador: "JIMENEZ PEÑUELA LUIS FERNANDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo1", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "AREVALO PINZON BRAYAN ESTIBEN", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo2", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "CASTILLO ROMERO LEIDER JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo3", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "EPIEYU IPUANA LEONEL DAVID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo4", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "GIL ALFONSO JOSE ALFREDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo5", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "MARTINEZ ROJO CRISTIAN ALEJANDRO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo6", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "POLO MENDOZA ALDAIR JOSE", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo7", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "RUIZ SAMUEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo8", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "TOCANCHON GARCIA JULIAN DAVID", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo9", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "VARGAS VEGA JOSE ANGEL", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo10", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "ZAPATA ARAUJO CRISTIAN OSWALDO", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" },
+    { id: "palo11", fecha: "2026-10-26", supervisor: "PALO SECO", colaborador: "GOMEZ TORRES ANTONIO MARIA", referencia: "FALCO N° 2", nTijera: "", firmaTrabajador: "", firmaSupervisor: "", observacion: "", descuentoNomina: "No", foto: "", entregado: "No", firmaEntrega: "" }
+];
+window.addEventListener("DOMContentLoaded", () => {
+    const canvas = document.getElementById("canvasFirma");
+    signaturePad = new SignaturePad(canvas);
+    
+    let registrosGuardados = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    if (registrosGuardados.length === 0) {
+        localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registrosInicialesPredeterminados));
+        sincronizarConNube(registrosInicialesPredeterminados);
+    }
+    
+    cargarTablaDesdeMemoria();
+});
+
+function sincronizarRegistroConNube(registro) {
+    if (window.firebaseDb && window.firebaseRef && window.firebaseSet) {
+        const itemRef = window.firebaseRef(window.firebaseDb, 'registrosTijerasFalcon/' + registro.id);
+        window.firebaseSet(itemRef, registro).catch(e => console.error("Error guardando en nube:", e));
+    }
+}
+
+function sincronizarConNube(todosLosRegistros) {
+    if (window.firebaseDb && window.firebaseRef && window.firebaseSet) {
+        const dbRef = window.firebaseRef(window.firebaseDb, 'registrosTijerasFalcon');
+        const objetoRegistros = {};
+        todosLosRegistros.forEach(r => { objetoRegistros[r.id] = r; });
+        window.firebaseSet(dbRef, objetoRegistros).catch(e => console.error("Error sincronizando todos:", e));
+    }
+}
+
+function obtenerFechaActual() {
+    const hoy = new Date();
+    const anio = hoy.getFullYear();
+    const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+    const dia = String(hoy.getDate()).padStart(2, "0");
+    return `${anio}-${mes}-${dia}`;
+}
+
+function cargarTablaDesdeMemoria() {
+    const cuerpo = document.getElementById("cuerpoTabla");
+    cuerpo.innerHTML = "";
+    
+    const supervisorSeleccionado = document.getElementById("selectSupervisor").value;
+    const registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    
+    const registrosFiltrados = registros.filter(r => r.supervisor === supervisorSeleccionado);
+    
+    if (registrosFiltrados.length > 0) {
+        registrosFiltrados.forEach(reg => agregarFilaManual(reg));
+    }
+    
+    const espaciosAdicionales = (supervisorSeleccionado === "FORMACION") ? 20 : 5;
+    
+    for (let i = 0; i < espaciosAdicionales; i++) {
+        agregarFilaManual({ 
+            supervisor: supervisorSeleccionado, 
+            colaborador: "", 
+            nTijera: "", 
+            observacion: "", 
+            descuentoNomina: "No" 
+        });
+    }
+}
+
+function restablecerDatosPredeterminados() {
+    if (confirm("¿Deseas volver a cargar la lista original de colaboradores?")) {
+        localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registrosInicialesPredeterminados));
+        sincronizarConNube(registrosInicialesPredeterminados);
+        cargarTablaDesdeMemoria();
+        alert("Lista inicial restablecida.");
+    }
+}
+
+function generarOpcionesReferencia(seleccionada = "") {
+    const falco = ["FALCO N° 2", "FALCO N° 6", "FALCO N° 8", "FALCO N° 9"];
+    let ars = [];
+    for (let i = 1; i <= 20; i++) {
+        ars.push(`ARS ${i}`);
+    }
+    const todasLasReferencias = [...falco, ...ars];
+
+    return todasLasReferencias.map(ref => 
+        `<option value="${ref}" ${ref === seleccionada ? "selected" : ""}>${ref}</option>`
+    ).join("");
+}
+
+function agregarFilaManual(datos = null) {
+    const cuerpo = document.getElementById("cuerpoTabla");
+    const supervisorSeleccionado = document.getElementById("selectSupervisor").value;
+    const registro = datos || {};
+    const fila = document.createElement("tr");
+
+    fila.dataset.id = registro.id || (Date.now().toString() + Math.random().toString(16).slice(2));
+    fila.dataset.registroId = registro.id || "";
+    fila.dataset.firmaTrabajador = registro.firmaTrabajador || "";
+    fila.dataset.firmaSupervisor = registro.firmaSupervisor || "";
+    fila.dataset.firmaEntrega = registro.firmaEntrega || "";
+    fila.dataset.foto = registro.foto || "";
+
+    fila.innerHTML = `
+        <td><input type="date" class="campo-fecha" value="${registro.fecha || obtenerFechaActual()}"></td>
+        <td><input type="text" class="campo-supervisor" value="${registro.supervisor || supervisorSeleccionado}" readonly style="width: 80px;"></td>
+        <td><input type="text" class="input-colaborador campo-colaborador" placeholder="Nombre completo" value="${registro.colaborador || ""}"></td>
+        <td><select class="select-referencia campo-referencia">${generarOpcionesReferencia(registro.referencia || "FALCO N° 2")}</select></td>
+        <td><input type="text" class="campo-tijera" placeholder="Número" value="${registro.nTijera || ""}" style="width: 60px;"></td>
+        <td><button type="button" onclick="abrirModalFirma(this, 'trabajador')">${registro.firmaTrabajador ? "Ver/Cambiar" : "Firmar"}</button></td>
+        <td><button type="button" onclick="abrirModalFirma(this, 'supervisor')">${registro.firmaSupervisor ? "Ver/Cambiar" : "Firmar"}</button></td>
+        <td><input type="text" class="campo-observacion" value="${registro.observacion || ""}"></td>
+        <td>
+            <select class="campo-descuento">
+                <option value="">Seleccionar</option>
+                <option value="Sí" ${registro.descuentoNomina === "Sí" ? "selected" : ""}>Sí</option>
+                <option value="No" ${registro.descuentoNomina === "No" ? "selected" : ""}>No</option>
+            </select>
+        </td>
+        <td>
+            <input type="file" accept="image/*" capture="camera" class="campo-foto" style="width: 110px;" onclick="this.value=null;">
+            <span class="estado-foto">${registro.foto ? "Foto guardada" : ""}</span>
+        </td>
+        <td><button type="button" onclick="abrirModalFirma(this, 'entrega')">${registro.firmaEntrega ? "Ver/Cambiar" : "Firmar entrega"}</button></td>
+        <td>
+            <button type="button" class="btn-guardar" onclick="guardarFila(this)">Guardar</button>
+            <button type="button" onclick="eliminarFila(this)">Eliminar</button>
+        </td>
+    `;
+    cuerpo.appendChild(fila);
+}
+
+function limpiarFirma() {
+    if (signaturePad) signaturePad.clear();
+}
+
+function cerrarModalFirma() {
+    document.getElementById("modalFirma").style.display = "none";
+    filaActualFirma = null;
+    tipoFirmaActual = null;
+}
+
+function abrirModalFirma(boton, tipo) {
+    filaActualFirma = boton.closest("tr");
+    tipoFirmaActual = tipo;
+    const modal = document.getElementById("modalFirma");
+    const canvas = document.getElementById("canvasFirma");
+    modal.style.display = "flex";
+    
+    if (signaturePad) {
+        signaturePad.clear();
+    }
+
+    const firmas = {
+        trabajador: filaActualFirma.dataset.firmaTrabajador,
+        supervisor: filaActualFirma.dataset.firmaSupervisor,
+        entrega: filaActualFirma.dataset.firmaEntrega
+    };
+
+    if (firmas[tipo]) {
+        const imagen = new Image();
+        imagen.onload = () => {
+            const contexto = canvas.getContext("2d");
+            contexto.clearRect(0, 0, canvas.width, canvas.height);
+            contexto.drawImage(imagen, 0, 0, canvas.width, canvas.height);
+        };
+        imagen.src = firmas[tipo];
+    }
+    document.getElementById("tituloModalFirma").textContent = tipo === "trabajador" ? "Firma del trabajador" : tipo === "supervisor" ? "Firma del supervisor" : "Firma de entrega";
+}
+
+function guardarFirmaCanvas() {
+    if (!filaActualFirma || !signaturePad || signaturePad.isEmpty()) {
+        alert("Por favor, realiza la firma antes de aceptar.");
+        return;
+    }
+    const firma = signaturePad.toDataURL("image/png");
+    if (tipoFirmaActual === "trabajador") filaActualFirma.dataset.firmaTrabajador = firma;
+    else if (tipoFirmaActual === "supervisor") filaActualFirma.dataset.firmaSupervisor = firma;
+    else if (tipoFirmaActual === "entrega") filaActualFirma.dataset.firmaEntrega = firma;
+
+    const selectores = { trabajador: "td:nth-child(6) button", supervisor: "td:nth-child(7) button", entrega: "td:nth-child(11) button" };
+    const boton = filaActualFirma.querySelector(selectores[tipoFirmaActual]);
+    if (boton) boton.textContent = "Ver/Cambiar";
+    
+    guardarFilaDesdeFirma(filaActualFirma);
+    cerrarModalFirma();
+}
+
+function guardarFilaDesdeFirma(fila) {
+    const colaboradorInput = fila.querySelector(".campo-colaborador").value.trim();
+    if (!colaboradorInput) return;
+
+    const registro = {
+        id: fila.dataset.registroId || fila.dataset.id,
+        fecha: fila.querySelector(".campo-fecha").value,
+        supervisor: fila.querySelector(".campo-supervisor").value,
+        colaborador: colaboradorInput,
+        referencia: fila.querySelector(".campo-referencia").value,
+        nTijera: fila.querySelector(".campo-tijera").value,
+        firmaTrabajador: fila.dataset.firmaTrabajador || "",
+        firmaSupervisor: fila.dataset.firmaSupervisor || "",
+        observacion: fila.querySelector(".campo-observacion").value,
+        descuentoNomina: fila.querySelector(".campo-descuento").value,
+        foto: fila.dataset.foto || "",
+        entregado: fila.dataset.firmaEntrega ? "Sí" : "No",
+        firmaEntrega: fila.dataset.firmaEntrega || ""
+    };
+
+    let registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    const indice = registros.findIndex(e => String(e.id) === String(registro.id));
+    if (indice >= 0) registros[indice] = registro;
+    else registros.push(registro);
+
+    localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
+    sincronizarRegistroConNube(registro);
+    fila.dataset.registroId = registro.id;
+}
+
+function guardarFila(boton) {
+    const fila = boton.closest("tr");
+    const colaboradorInput = fila.querySelector(".campo-colaborador").value.trim();
+    if (!colaboradorInput) {
+        alert("Por favor, ingresa el nombre del colaborador antes de guardar.");
+        return;
+    }
+
+    const inputFoto = fila.querySelector(".campo-foto");
+    const archivoFoto = inputFoto.files[0];
+
+    if (archivoFoto) {
+        const lector = new FileReader();
+        lector.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement("canvas");
+                const MAX_WIDTH = 600;
+                const MAX_HEIGHT = 600;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+                } else {
+                    if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+
+                fila.dataset.foto = canvas.toDataURL("image/jpeg", 0.7);
+                
+                const estadoFotoSpan = fila.querySelector(".estado-foto");
+                if (estadoFotoSpan) estadoFotoSpan.textContent = "Foto guardada";
+                
+                procesarGuardadoLocal(fila);
+            };
+            img.src = e.target.result;
+        };
+        lector.readAsDataURL(archivoFoto);
+    } else {
+        procesarGuardadoLocal(fila);
+    }
+}
+
+function procesarGuardadoLocal(fila) {
+    const registro = {
+        id: fila.dataset.registroId || fila.dataset.id,
+        fecha: fila.querySelector(".campo-fecha").value,
+        supervisor: fila.querySelector(".campo-supervisor").value,
+        colaborador: fila.querySelector(".campo-colaborador").value,
+        referencia: fila.querySelector(".campo-referencia").value,
+        nTijera: fila.querySelector(".campo-tijera").value,
+        firmaTrabajador: fila.dataset.firmaTrabajador || "",
+        firmaSupervisor: fila.dataset.firmaSupervisor || "",
+        observacion: fila.querySelector(".campo-observacion").value,
+        descuentoNomina: fila.querySelector(".campo-descuento").value,
+        foto: fila.dataset.foto || "",
+        entregado: fila.dataset.firmaEntrega ? "Sí" : "No",
+        firmaEntrega: fila.dataset.firmaEntrega || ""
+    };
+
+    let registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    const indice = registros.findIndex(e => String(e.id) === String(registro.id));
+    if (indice >= 0) {
+        registros[indice] = registro;
+    } else {
+        registros.push(registro);
+    }
+
+    localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
+    sincronizarRegistroConNube(registro);
+    fila.dataset.registroId = registro.id;
+    alert("Registro guardado correctamente.");
+}
+
+function eliminarFila(boton) {
+    if (!confirm("¿Deseas eliminar esta fila?")) return;
+    const fila = boton.closest("tr");
+    const id = fila.dataset.registroId || fila.dataset.id;
+    let registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    registros = registros.filter(r => String(r.id) !== String(id));
+    localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
+    
+    if (window.firebaseDb && window.firebaseRef && window.firebaseSet) {
+        const itemRef = window.firebaseRef(window.firebaseDb, 'registrosTijerasFalcon/' + id);
+        window.firebaseSet(itemRef, null);
+    }
+    cargarTablaDesdeMemoria();
+}
+
+function cambiarVista(vista) {
+    document.getElementById("vistaRegistro").classList.remove("activa");
+    document.getElementById("vistaConsolidado").classList.remove("activa");
+    if (vista === "consolidado") {
+        document.getElementById("vistaConsolidado").classList.add("activa");
+        cargarConsolidado();
+    } else {
+        document.getElementById("vistaRegistro").classList.add("activa");
+    }
+}
+
+const supervisoresYAreas = [
+    "ELENA", "XIMENA", "MARTHA", "SANDRA", "YOLANDA", "LEONARDO", "JORGE", "VICTOR",
+    "ADRIANA", "MARCELA", "MEDICIONES", "RETOCONEO", "BZC", "MIPE", "FORMACION",
+    "ADMON", "MIRFE", "MTTO", "PALO SECO"
+];
+
+function cargarConsolidado() {
+    const contenedor = document.getElementById("contenedorTablas");
+    const registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    contenedor.innerHTML = "";
+
+    supervisoresYAreas.forEach(supervisor => {
+        const registrosSupervisor = registros.filter(r => r.supervisor === supervisor && r.colaborador && r.colaborador.trim() !== "");
+        if (registrosSupervisor.length === 0) return;
+
+        const seccion = document.createElement("div");
+        seccion.className = "seccion-tabla-supervisor";
+        const titulo = document.createElement("h3");
+        titulo.className = "titulo-supervisor";
+        titulo.textContent = supervisor;
+        seccion.appendChild(titulo);
+
+        const tablaContenedor = document.createElement("div");
+        tablaContenedor.className = "tabla-contenedor";
+        const tabla = document.createElement("table");
+        tabla.className = "tabla-principal";
+        tabla.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Supervisor</th>
+                    <th>Colaborador</th>
+                    <th>Referencia</th>
+                    <th>N° Tijera</th>
+                    <th>Firma del Trabajador</th>
+                    <th>Firma del Supervisor</th>
+                    <th>Observación</th>
+                    <th>Descuento por Nómina</th>
+                    <th>Foto Evidencia</th>
+                    <th>Entregado</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+
+        const tbody = tabla.querySelector("tbody");
+        registrosSupervisor.forEach(registro => {
+            const fila = document.createElement("tr");
+            
+            const htmlFirmaTrabajador = registro.firmaTrabajador ? `<img src="${registro.firmaTrabajador}" style="height:35px; max-width:100px; object-fit:contain;">` : 'Pendiente';
+            const htmlFirmaSupervisor = registro.firmaSupervisor ? `<img src="${registro.firmaSupervisor}" style="height:35px; max-width:100px; object-fit:contain;">` : 'Pendiente';
+            const htmlFoto = registro.foto ? `<img src="${registro.foto}" style="height:35px; max-width:50px; object-fit:contain;">` : 'Sin foto';
+
+            fila.innerHTML = `
+                <td>${registro.fecha || ""}</td>
+                <td>${registro.supervisor || ""}</td>
+                <td>${registro.colaborador || ""}</td>
+                <td>${registro.referencia || ""}</td>
+                <td>${registro.nTijera || ""}</td>
+                <td>${htmlFirmaTrabajador}</td>
+                <td>${htmlFirmaSupervisor}</td>
+                <td>${registro.observacion || ""}</td>
+                <td>${registro.descuentoNomina || ""}</td>
+                <td>${htmlFoto}</td>
+                <td>${registro.entregado || "No"}</td>
+                <td>
+                    <button class="btn-guardar" onclick="editarRegistroPorId('${registro.id}')">Editar</button>
+                    <button onclick="borrarRegistroPorId('${registro.id}')">Eliminar</button>
+                </td>
+            `;
+            tbody.appendChild(fila);
+        });
+
+        tablaContenedor.appendChild(tabla);
+        seccion.appendChild(tablaContenedor);
+        contenedor.appendChild(seccion);
+    });
+}
+
+function editarRegistroPorId(id) {
+    const registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    const registro = registros.find(e => String(e.id) === String(id));
+    if (!registro) {
+        alert("No se encontró el registro.");
+        return;
+    }
+    
+    cambiarVista("registro");
+    document.getElementById("selectSupervisor").value = registro.supervisor;
+    cargarTablaDesdeMemoria();
+
+    setTimeout(() => {
+        const filas = Array.from(document.querySelectorAll("#cuerpoTabla tr"));
+        let fila = filas.find(e => String(e.dataset.registroId) === String(id));
+
+        if (!fila) {
+            fila = filas.find(e => e.querySelector(".campo-colaborador").value === "") || filas[0];
+        }
+
+        if (!fila) {
+            alert("No se pudo ubicar la línea en la tabla para editar.");
+            return;
+        }
+
+        fila.dataset.registroId = registro.id;
+        fila.dataset.firmaTrabajador = registro.firmaTrabajador || "";
+        fila.dataset.firmaSupervisor = registro.firmaSupervisor || "";
+        fila.dataset.firmaEntrega = registro.firmaEntrega || "";
+        fila.dataset.foto = registro.foto || "";
+
+        fila.querySelector(".campo-fecha").value = registro.fecha || obtenerFechaActual();
+        fila.querySelector(".campo-supervisor").value = registro.supervisor || "";
+        fila.querySelector(".campo-colaborador").value = registro.colaborador || "";
+        fila.querySelector(".campo-referencia").value = registro.referencia || "FALCO N° 2";
+        fila.querySelector(".campo-tijera").value = registro.nTijera || "";
+        fila.querySelector(".campo-observacion").value = registro.observacion || "";
+        fila.querySelector(".campo-descuento").value = registro.descuentoNomina || "No";
+
+        if (registro.firmaTrabajador) fila.querySelector("td:nth-child(6) button").textContent = "Ver/Cambiar";
+        if (registro.firmaSupervisor) fila.querySelector("td:nth-child(7) button").textContent = "Ver/Cambiar";
+        if (registro.firmaEntrega) fila.querySelector("td:nth-child(11) button").textContent = "Ver/Cambiar";
+
+        alert("Registro cargado con éxito. Realiza los cambios y pulsa Guardar.");
+    }, 100);
+}
+
+function borrarRegistroPorId(id) {
+    if (!confirm("¿Deseas eliminar este registro definitivamente?")) return;
+    let registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+    registros = registros.filter(r => String(r.id) !== String(id));
+    localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
+    
+    if (window.firebaseDb && window.firebaseRef && window.firebaseSet) {
+        const itemRef = window.firebaseRef(window.firebaseDb, 'registrosTijerasFalcon/' + id);
+        window.firebaseSet(itemRef, null);
+    }
+    cargarConsolidado();
+}
+
+function descargarArchivoHTMLConDatos() {
+    const filas = document.querySelectorAll("#cuerpoTabla tr");
+    let registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+
+    filas.forEach(fila => {
+        const colVal = fila.querySelector(".campo-colaborador").value.trim();
+        if (colVal) {
+            const regId = fila.dataset.registroId || fila.dataset.id;
+            const obj = {
+                id: regId,
+                fecha: fila.querySelector(".campo-fecha").value,
+                supervisor: fila.querySelector(".campo-supervisor").value,
+                colaborador: colVal,
+                referencia: fila.querySelector(".campo-referencia").value,
+                nTijera: fila.querySelector(".campo-tijera").value,
+                firmaTrabajador: fila.dataset.firmaTrabajador || "",
+                firmaSupervisor: fila.dataset.firmaSupervisor || "",
+                observacion: fila.querySelector(".campo-observacion").value,
+                descuentoNomina: fila.querySelector(".campo-descuento").value,
+                foto: fila.dataset.foto || "",
+                entregado: fila.dataset.firmaEntrega ? "Sí" : "No",
+                firmaEntrega: fila.dataset.firmaEntrega || ""
+            };
+            const idx = registros.findIndex(e => String(e.id) === String(regId));
+            if (idx >= 0) registros[idx] = obj;
+            else registros.push(obj);
+        }
+    });
+
+    localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
+    sincronizarConNube(registros);
+
+    const contenidoHTML = document.documentElement.outerHTML;
+    const blob = new Blob([contenidoHTML], { type: "text/html;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `Registro_Tijeras_Actualizado_${new Date().toISOString().slice(0,10)}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+
+    alert("¡Archivo generado con éxito!");
+}
+
+async function exportarExcelConsolidado() {
+    const registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]").filter(r => r.colaborador && r.colaborador.trim() !== "");
+    if (typeof ExcelJS === "undefined") {
+        alert("No se pudo cargar la librería ExcelJS. Revisa tu conexión a Internet.");
+        return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const notaLegal = "Los suscritos trabajadores, de conformidad con lo establecido en el Artículo 149 (Numerales 1 y 2) del Código Sustantivo del Trabajo, autorizamos de manera expresa, libre, voluntaria y por escrito a nuestro empleador Falcon Farms de Colombia S.A. - Finca Torremolinos, para que realice el descuento de nuestros respectivos salarios por concepto de la pérdida de herramientas de trabajo asignadas a nuestro cargo. El descuento se aplicará por el valor real de la herramienta, en las cuotas acordadas y respetando estrictamente los límites legales vigentes en Colombia. Para constancia de nuestra acceptance voluntaria, firmamos individualmente a continuación:";
+
+    const bordeNegro = {
+        top: { style: 'thin', color: { argb: '000000' } },
+        left: { style: 'thin', color: { argb: '000000' } },
+        bottom: { style: 'thin', color: { argb: '000000' } },
+        right: { style: 'thin', color: { argb: '000000' } }
+    };
+
+    const bordeGris = {
+        top: { style: 'thin', color: { argb: 'D9D9D9' } },
+        left: { style: 'thin', color: { argb: 'D9D9D9' } },
+        bottom: { style: 'thin', color: { argb: 'D9D9D9' } },
+        right: { style: 'thin', color: { argb: 'D9D9D9' } }
+    };
+
+    let logoImageId = null;
+    try {
+        const urlSegura = "https://images.weserv.nl/?url=" + encodeURIComponent("falconfarms.com/wp-content/uploads/2025/12/Logo-Falcon.png") + "&output=png";
+        const respuesta = await fetch(urlSegura);
+        const blob = await respuesta.blob();
+        
+        const base64Puro = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+        });
+
+        const base64DataClean = base64Puro.split(',')[1] || base64Puro;
+        logoImageId = workbook.addImage({
+            base64: base64DataClean,
+            extension: 'png'
+        });
+    } catch (e) {
+        console.warn("Aviso de logo:", e);
+    }
+
+    supervisoresYAreas.forEach(supervisor => {
+        const registrosSupervisor = registros.filter(r => String(r.supervisor || "").trim().toUpperCase() === supervisor.trim().toUpperCase());
+        if (registrosSupervisor.length === 0) return;
+
+        const nombreHoja = supervisor.replace(/[\\/?*[\]:]/g, "").substring(0, 31) || "Supervisor";
+        const ws = workbook.addWorksheet(nombreHoja);
+
+        ws.columns = [
+            { width: 13 }, { width: 18 }, { width: 30 }, { width: 16 },
+            { width: 12 }, { width: 22 }, { width: 22 }, { width: 28 },
+            { width: 18 }, { width: 16 }, { width: 14 }
+        ];
+
+        ws.getRow(1).height = 25;
+        ws.getRow(2).height = 25;
+        ws.getRow(3).height = 18;
+        ws.getRow(4).height = 22;
+        ws.getRow(5).height = 65;
+        ws.getRow(6).height = 8;
+        ws.getRow(7).height = 28;
+
+        ws.mergeCells('A1:B3');
+        ws.mergeCells('C1:J1');
+        ws.mergeCells('C2:J2');
+        ws.mergeCells('C3:J3');
+        ws.mergeCells('K1:K1');
+        ws.mergeCells('K2:K2');
+        ws.mergeCells('K3:K3');
+        ws.mergeCells('A4:K4');
+        ws.mergeCells('A5:K5');
+
+        ws.getCell('C1').value = "FALCON FARMS DE COLOMBIA S.A. - FINCA TORREMOLINOS";
+        ws.getCell('C2').value = "ENTREGA Y ASIGNACIÓN DE TIJERAS";
+        ws.getCell('K1').value = "Versión 1";
+        ws.getCell('K2').value = "sep.-26";
+        ws.getCell('K3').value = "Página 1 de 1";
+        
+        ws.getCell('A5').value = notaLegal;
+
+        ['C1', 'C2'].forEach(ref => {
+            const cell = ws.getCell(ref);
+            cell.font = { bold: true, size: 11, name: 'Arial' };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+
+        ['K1', 'K2', 'K3'].forEach(ref => {
+            const cell = ws.getCell(ref);
+            cell.font = { size: 9, name: 'Arial' };
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        });
+
+        ws.getCell('A4').font = { bold: true, size: 10, name: 'Arial' };
+        ws.getCell('A4').alignment = { horizontal: 'left', vertical: 'middle' };
+        ws.getCell('A5').font = { size: 8, name: 'Arial' };
+        ws.getCell('A5').alignment = { horizontal: 'justify', vertical: 'middle', wrapText: true };
+
+        for (let r = 1; r <= 3; r++) {
+            for (let c = 1; c <= 11; c++) ws.getCell(r, c).border = bordeNegro;
+        }
+        for (let c = 1; c <= 11; c++) {
+            ws.getCell(4, c).border = bordeNegro;
+            ws.getCell(5, c).border = bordeNegro;
+        }
+
+        if (logoImageId !== null) {
+            ws.addImage(logoImageId, {
+                tl: { col: 0, row: 0 },
+                br: { col: 2, row: 3 },
+                editAs: 'oneCell'
+            });
+        }
+
+        const headers = [
+            "Fecha", "Supervisor", "Colaborador", "Referencia", "N° Tijera",
+            "Firma del Trabajador", "Firma del Supervisor", "Observación",
+            "Descuento por Nómina", "Foto Evidencia", "Entregado"
+        ];
+
+        const rowHeaders = ws.getRow(7);
+        headers.forEach((h, idx) => {
+            const cell = rowHeaders.getCell(idx + 1);
+            cell.value = h;
+            cell.font = { bold: true, size: 10, name: 'Arial' };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9E2F3' } };
+            cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+            cell.border = bordeNegro;
+        });
+
+        registrosSupervisor.forEach((reg, iIdx) => {
+            const rowNumber = 8 + iIdx;
+            const row = ws.getRow(rowNumber);
+            row.height = 22;
+
+            const values = [
+                reg.fecha || "",
+                reg.supervisor || "",
+                reg.colaborador || "",
+                reg.referencia || "",
+                reg.nTijera || "",
+                reg.firmaTrabajador ? "Firmado" : "Pendiente",
+                reg.firmaSupervisor ? "Firmado" : "Pendiente",
+                reg.observacion || "",
+                reg.descuentoNomina || "No",
+                reg.foto ? "Disponible" : "Sin foto",
+                reg.entregado || "No"
+            ];
+
+            values.forEach((v, cIdx) => {
+                const cell = row.getCell(cIdx + 1);
+                cell.value = v;
+                cell.font = { size: 9, name: 'Arial' };
+                cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+                cell.border = bordeGris;
+            });
+        });
+
+        ws.pageSetup = { orientation: 'landscape', paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+        ws.margins = { left: 0.25, right: 0.25, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 };
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Consolidado_Entrega_Tijeras_Falcon_${new Date().toISOString().slice(0,10)}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+}
+</script>
+</body>
+</html>

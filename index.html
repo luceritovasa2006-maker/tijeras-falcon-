@@ -921,15 +921,49 @@ function guardarFilaDesdeFirma(fila) {
 
 function guardarFila(boton) {
     const fila = boton.closest("tr");
-    const colaboradorInput = fila.querySelector(".campo-colaborador").value.trim();
-    if (!colaboradorInput) {
+    const colaboradorInput = fila.querySelector(".campo-colaborador");
+    
+    if (!colaboradorInput || !colaboradorInput.value.trim()) {
         alert("Por favor, ingresa el nombre del colaborador antes de guardar.");
         return;
     }
 
     const inputFoto = fila.querySelector(".campo-foto");
     
-    // Si seleccionaron un archivo nuevo en este momento
+    // Función interna para proceder con el guardado de datos
+    const realizarGuardado = () => {
+        const registro = {
+            id: fila.dataset.registroId || fila.dataset.id,
+            fecha: fila.querySelector(".campo-fecha").value,
+            supervisor: fila.querySelector(".campo-supervisor").value,
+            colaborador: colaboradorInput.value.trim(),
+            referencia: fila.querySelector(".campo-referencia").value,
+            nTijera: fila.querySelector(".campo-tijera").value,
+            firmaTrabajador: fila.dataset.firmaTrabajador || "",
+            firmaSupervisor: fila.dataset.firmaSupervisor || "",
+            observacion: fila.querySelector(".campo-observacion").value,
+            descuentoNomina: fila.querySelector(".campo-descuento").value,
+            foto: fila.dataset.foto || "",
+            entregado: fila.dataset.firmaEntrega ? "Sí" : "No",
+            firmaEntrega: fila.dataset.firmaEntrega || ""
+        };
+
+        let registros = JSON.parse(localStorage.getItem("registrosTijerasFalcon") || "[]");
+        const indice = registros.findIndex(e => String(e.id) === String(registro.id));
+        if (indice >= 0) {
+            registros[indice] = registro;
+        } else {
+            registros.push(registro);
+        }
+
+        localStorage.setItem("registrosTijerasFalcon", JSON.stringify(registros));
+        sincronizarRegistroConNube(registro);
+        fila.dataset.registroId = registro.id;
+        
+        alert("¡Registro guardado correctamente!");
+    };
+
+    // Si hay una foto seleccionada, la procesamos; si no, guarda de una vez
     if (inputFoto && inputFoto.files && inputFoto.files[0]) {
         const archivoFoto = inputFoto.files[0];
         const lector = new FileReader();
@@ -944,15 +978,9 @@ function guardarFila(boton) {
                 let height = img.height;
 
                 if (width > height) {
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                    }
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
                 } else {
-                    if (height > MAX_HEIGHT) {
-                        width *= MAX_HEIGHT / height;
-                        height = MAX_HEIGHT;
-                    }
+                    if (height > MAX_HEIGHT) { width *= MAX_HEIGHT / height; height = MAX_HEIGHT; }
                 }
 
                 canvas.width = width;
@@ -960,25 +988,24 @@ function guardarFila(boton) {
                 const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Guardamos la foto comprimida directamente en el dataset de la fila
-                const base64Foto = canvas.toDataURL("image/jpeg", 0.6);
-                fila.dataset.foto = base64Foto;
+                fila.dataset.foto = canvas.toDataURL("image/jpeg", 0.6);
                 
                 const estadoFotoSpan = fila.querySelector(".estado-foto");
                 if (estadoFotoSpan) estadoFotoSpan.textContent = "Foto guardada";
                 
-                // Ejecutamos el guardado final con la foto ya lista
-                ejecutarGuardadoFinal(fila);
+                realizarGuardado();
             };
             img.src = e.target.result;
         };
+        lector.onerror = function() {
+            // Si ocurre algún error leyendo el archivo, guarda los demás datos para no bloquear al usuario
+            realizarGuardado();
+        };
         lector.readAsDataURL(archivoFoto);
     } else {
-        // Si no seleccionaron foto nueva, guardamos con lo que ya tuviera la fila previamente
-        ejecutarGuardadoFinal(fila);
+        realizarGuardado();
     }
 }
-
 function ejecutarGuardadoFinal(fila) {
     const registro = {
         id: fila.dataset.registroId || fila.dataset.id,
